@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const auth = require("../middleware/authMiddleware");
-const { ensureProjectMember } = require("../middleware/roleMiddleware");
+const { roleMiddleware } = require("../middleware/roleMiddleware");
 // const projectController = require("../controllers/projectController");
 const {createProject,
   getProjectsForUser,
@@ -16,12 +16,12 @@ router.post("/create-project", createProject);
 
 router.get("/get-projects", getProjectsForUser);
 
-router.get("/get-project/:id", ensureProjectMember, getProjectById);
+router.get("/get-project/:id", roleMiddleware, getProjectById);
 
-router.put("/update-project/:id", ensureProjectMember, updateProject);
+router.put("/update-project/:id", roleMiddleware, updateProject);
 
-router.delete("/delete-project/:id", ensureProjectMember, deleteProject);
+router.delete("/delete-project/:id", roleMiddleware, deleteProject);
 
-router.post("/add-member/:id", ensureProjectMember, addMember);
+router.post("/add-member/:id", roleMiddleware, addMember);
 
 module.exports = router;

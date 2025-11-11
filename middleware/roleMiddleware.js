@@ -1,13 +1,11 @@
 const Project = require("../models/Project.model");
 
-const ensureProjectMember = async (req, res, next) => {
+const roleMiddleware = async (req, res, next) => {
   try {
     const projectId =
       req.params.id || req.body.projectId || req.query.projectId;
     if (!projectId) {
-      return res
-        .status(400)
-        .json({ message: "projectId is required" });
+      return res.status(400).json({ message: "projectId is required" });
     }
 
     const project = await Project.findById(projectId).lean();
@@ -33,4 +31,4 @@ const ensureProjectMember = async (req, res, next) => {
   }
 };
 
-module.exports = { ensureProjectMember };
+module.exports = { roleMiddleware };
