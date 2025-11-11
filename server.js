@@ -1,8 +1,9 @@
 const express = require('express')
 const authRoutes = require('./routes/authRoutes');
+const projectRoutes = require('./routes/projectRoutes');
 
-require('dotenv').config();
-require('./config/db');
+require("dotenv").config();
+require("./config/db");
 
 const port = process.env.PORT
 
@@ -13,6 +14,7 @@ app.use(express.json());
 
 
 app.use('/api/auth', authRoutes);
+app.use('/api/projects', projectRoutes);
 
 app.get("/test", (req,resp)=>{
     resp.send("Api is working properly")
