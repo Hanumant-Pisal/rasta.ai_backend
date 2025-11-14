@@ -8,25 +8,23 @@ const {
   updateTask,
   deleteTask,
   updateTaskOrder,
+  getAllTasksForUser
 } = require("../controllers/taskController");
 
 
 router.use(auth);
 
+// Get all tasks for user (must be before /project/:id to avoid conflict)
+router.get("/all", getAllTasksForUser);
 
 router.post("/", createTask);
-
 
 router.get("/project/:id", getTasksByProject);
 
 router.put("/update-order", updateTaskOrder);
 
-// router.post("/create-task", roleMiddleware, createTask);
-
-// router.get("/get-tasks/:projectId", roleMiddleware, getTasksByProject);
-
-// router.put("/update-task/:id", roleMiddleware, updateTask);
-
-// router.delete("/delete-task/:id", roleMiddleware, deleteTask);
+// Update and delete individual tasks
+router.put("/:id", updateTask);
+router.delete("/:id", deleteTask);
 
 module.exports = router;
