@@ -3,7 +3,6 @@ const User = require('../models/User.model');
 
 
 exports.getAllMembers = async (req, res, next) => {
-  console.log('Fetching all members...');
   try {
   
     if (!User || typeof User.find !== 'function') {
@@ -23,9 +22,7 @@ exports.getAllMembers = async (req, res, next) => {
     })
     .select('-password -__v -createdAt -updatedAt')
     .sort({ name: 1 })
-    .lean(); 
-
-    console.log(`Found ${members.length} members`);
+    .lean();
     
     res.status(200).json({
       success: true,
@@ -71,7 +68,6 @@ exports.deleteMember = async (req, res, next) => {
       message: 'User deleted successfully'
     });
   } catch (error) {
-    console.error('Error deleting user:', error);
     res.status(500).json({
       success: false,
       message: 'Error deleting user',

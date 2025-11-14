@@ -5,8 +5,6 @@ const User = require("../models/User.model");
 
 const createTask = async (req, res) => {
   try {
-    console.log('Request body:', req.body);
-    console.log('User ID:', req.user?.id);
     
     const { projectId, title, description = '', assignee = null, dueDate = null, status = 'pending' } = req.body;
 
@@ -91,13 +89,6 @@ const createTask = async (req, res) => {
       }
     }
 
-    console.log('Creating task with data:', {
-      ...taskData,
-      projectId: projectId.toString(),
-      createdBy: req.user.id,
-      assignee: taskData.assignee?.toString() || null
-    });
-
     const task = new Task(taskData);
     const validationError = task.validateSync();
     
@@ -116,13 +107,10 @@ const createTask = async (req, res) => {
 
     await task.save();
     
-    
     const populatedTask = await Task.findById(task._id)
       .populate('assignee', 'name email')
       .populate('createdBy', 'name email')
       .lean();
-
-    console.log('Task created successfully:', populatedTask);
     
     res.status(201).json({ 
       success: true, 
@@ -197,10 +185,6 @@ const getTasksByProject = async (req, res) => {
       });
     }
 
-    console.log('Fetching tasks for project:', projectId);
-    console.log('Authenticated user ID:', userId);
-
-    
     const project = await Project.findOne({
       _id: projectId,
       $or: [
@@ -210,7 +194,6 @@ const getTasksByProject = async (req, res) => {
     });
 
     if (!project) {
-      console.log('Access denied - user does not have permission to access this project');
       return res.status(403).json({ 
         success: false,
         message: "You don't have permission to access this project",
@@ -233,8 +216,6 @@ const getTasksByProject = async (req, res) => {
       console.error('Database error in getTasksByProject:', dbError);
       tasks = [];
     }
-
-    console.log(`Found ${tasks.length} tasks for project ${projectId}`);
 
     return res.json({ 
       success: true,
@@ -261,12 +242,6 @@ const getTasksByProject = async (req, res) => {
 
 const updateTask = async (req, res) => {
   try {
-
-    const user = await User.findById(req.user.id);
-    if (user.role !== 'member' && user.role !== 'owner') {
-      return res.status(403).json({ message: "Only members can update tasks" });
-    }
-
     const { id } = req.params;
     const updates = (({ title, description, assignee, dueDate, status }) => ({
       title,
@@ -277,56 +252,112 @@ const updateTask = async (req, res) => {
     }))(req.body);
 
     const task = await Task.findById(id);
-    if (!task) return res.status(404).json({ message: "Task not found" });
+    if (!task) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Task not found" 
+      });
+    }
 
     const project = await Project.findById(task.projectId);
-    if (!project) return res.status(404).json({ message: "Project not found" });
-    const isMember =
-      project.createdBy.toString() === req.user.id 
-      (Array.isArray(project.members) &&
-        project.members.find((m) => m.toString() === req.user.id));
-    if (!isMember)
-      return res.status(403).json({ message: "Unauthorized to edit task" });
+    if (!project) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Project not found" 
+      });
+    }
+
+    // Check if user is project owner or member
+    const userId = req.user.id.toString();
+    const isOwner = project.createdBy.toString() === userId;
+    const isMember = Array.isArray(project.members) && 
+      project.members.some((m) => m.toString() === userId);
+    
+    if (!isOwner && !isMember) {
+      console.log('Authorization failed:', {
+        userId,
+        projectCreatedBy: project.createdBy.toString(),
+        projectMembers: project.members.map(m => m.toString()),
+        isOwner,
+        isMember
+      });
+      return res.status(403).json({ 
+        success: false,
+        message: "Unauthorized to edit task" 
+      });
+    }
 
     Object.keys(updates).forEach((key) => {
       if (updates[key] !== undefined) task[key] = updates[key];
     });
 
-    await task.save();
-    res.json({ task });
+    const updatedTask = await task.save();
+    
+    // Populate assignee and createdBy for consistent response
+    await updatedTask.populate('assignee', 'name email');
+    await updatedTask.populate('createdBy', 'name email');
+    
+    res.json({ 
+      success: true,
+      task: updatedTask,
+      message: "Task updated successfully"
+    });
   } catch (err) {
-    console.error("updateTask error", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("updateTask error:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 };
 
 const deleteTask = async (req, res) => {
   try {
-    
-    const user = await User.findById(req.user.id);
-    if (user.role !== 'member' && user.role !== 'owner') {
-      return res.status(403).json({ message: "Only members can delete tasks" });
-    }
-
     const { id } = req.params;
     const task = await Task.findById(id);
-    if (!task) return res.status(404).json({ message: "Task not found" });
+    
+    if (!task) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Task not found" 
+      });
+    }
 
     const project = await Project.findById(task.projectId);
-    if (!project) return res.status(404).json({ message: "Project not found" });
+    if (!project) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Project not found" 
+      });
+    }
 
-    const isMember =
-      project.createdBy.toString() === req.user.id 
-      (Array.isArray(project.members) &&
-        project.members.find((m) => m.toString() === req.user.id));
-    if (!isMember)
-      return res.status(403).json({ message: "Unauthorized to delete task" });
+    // Check if user is project owner or member
+    const userId = req.user.id.toString();
+    const isOwner = project.createdBy.toString() === userId;
+    const isMember = Array.isArray(project.members) && 
+      project.members.some((m) => m.toString() === userId);
+    
+    if (!isOwner && !isMember) {
+      return res.status(403).json({ 
+        success: false,
+        message: "Unauthorized to delete task" 
+      });
+    }
 
-    await task.remove();
-    res.json({ message: "Task deleted" });
+    await Task.deleteOne({ _id: task._id });
+    
+    res.json({ 
+      success: true,
+      message: "Task deleted successfully" 
+    });
   } catch (err) {
-    console.error("deleteTask error", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("deleteTask error:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 };
 
@@ -413,10 +444,57 @@ const updateTaskOrder = async (req, res) => {
   }
 };
 
+const getAllTasksForUser = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false,
+        message: "Authentication required",
+        data: []
+      });
+    }
+
+    // Find all projects the user is part of
+    const userProjects = await Project.find({
+      $or: [
+        { createdBy: userId },
+        { members: { $in: [userId] } }
+      ]
+    }).select('_id');
+
+    const projectIds = userProjects.map(p => p._id);
+
+    // Get all tasks from those projects
+    const tasks = await Task.find({
+      projectId: { $in: projectIds }
+    })
+      .populate('assignee', 'name email')
+      .populate('createdBy', 'name email')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.json({ 
+      success: true,
+      data: tasks 
+    });
+
+  } catch (error) {
+    console.error("Error in getAllTasksForUser:", error);
+    return res.status(500).json({ 
+      success: false,
+      message: "Server error",
+      data: []
+    });
+  }
+};
+
 module.exports = {
   createTask,
   getTasksByProject,
   updateTask,
   deleteTask,
-  updateTaskOrder
+  updateTaskOrder,
+  getAllTasksForUser
 };

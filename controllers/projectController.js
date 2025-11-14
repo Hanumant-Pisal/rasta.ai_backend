@@ -1,5 +1,6 @@
 const Project = require("../models/Project.model");
 const User = require("../models/User.model");
+const Task = require("../models/Task.model");
 
 
 
@@ -80,9 +81,20 @@ const getProjectsForUser = async (req, res) => {
       .skip(skip)
       .limit(limit);
 
+    // Add task count to each project
+    const projectsWithTaskCount = await Promise.all(
+      projects.map(async (project) => {
+        const taskCount = await Task.countDocuments({ projectId: project._id });
+        return {
+          ...project.toObject(),
+          taskCount
+        };
+      })
+    );
+
     res.json({
       success: true,
-      data: projects,
+      data: projectsWithTaskCount,
       pagination: {
         total,
         page,
@@ -138,12 +150,9 @@ const updateProject = async (req, res) => {
 const deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log('Deleting project ID:', id);
-    
     
     const project = await Project.findById(id);
     if (!project) {
-      console.log('Project not found:', id);
       return res.status(404).json({ 
         success: false,
         message: "Project not found" 
@@ -161,7 +170,6 @@ const deleteProject = async (req, res) => {
 
     
     if (createdById !== userId) {
-      console.log('User not authorized to delete project. User ID:', userId, 'Creator ID:', createdById);
       return res.status(403).json({ 
         success: false,
         message: "Only project creator can delete project" 
@@ -171,7 +179,6 @@ const deleteProject = async (req, res) => {
     
     await Project.findByIdAndDelete(id);
     
-    console.log('Project deleted successfully:', id);
     res.json({ 
       success: true,
       message: "Project deleted successfully" 

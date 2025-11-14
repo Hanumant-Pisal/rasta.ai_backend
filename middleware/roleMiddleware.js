@@ -7,9 +7,6 @@ const roleMiddleware = async (req, res, next) => {
     const projectId = req.params.id || req.params.projectId || 
                      (req.body && req.body.projectId) || 
                      (req.query && req.query.projectId);
-    
-    console.log('Role Middleware - Project ID:', projectId);
-    console.log('User ID:', req.user?.id);
 
     if (!projectId) {
       return res.status(400).json({ 
@@ -25,7 +22,6 @@ const roleMiddleware = async (req, res, next) => {
       .lean();
 
     if (!project) {
-      console.log('Project not found:', projectId);
       return res.status(404).json({ 
         success: false,
         message: "Project not found" 
@@ -34,7 +30,6 @@ const roleMiddleware = async (req, res, next) => {
 
     const userId = req.user?.id?.toString();
     if (!userId) {
-      console.log('No user ID in request');
       return res.status(401).json({ 
         success: false,
         message: "Authentication required" 
@@ -50,7 +45,6 @@ const roleMiddleware = async (req, res, next) => {
     
     const createdById = normalizeId(project.createdBy);
     if (createdById === userId) {
-      console.log('User is project owner');
       req.userRole = 'owner';
       req.project = project;
       return next();
@@ -63,13 +57,11 @@ const roleMiddleware = async (req, res, next) => {
     });
     
     if (isMember) {
-      console.log('User is project member');
       req.userRole = 'member';
       req.project = project;
       return next();
     }
 
-    console.log('Access denied - User is not a member');
     return res.status(403).json({ 
       success: false,
       message: "You don't have permission to access this project" 
